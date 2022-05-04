@@ -4,12 +4,17 @@
 #include <pthread.h>
 #include <vector>
 #include <stdlib.h>
+#include <cmath>
 using namespace std;
 using namespace std::this_thread;
 using namespace std::chrono; 
 
 
+pthread_mutex_t mutex1 = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mutex2 = PTHREAD_MUTEX_INITIALIZER;
+
 bool finish = false;
+int detectionRange = 7;
 
 /*
     kończenie watkow (nasluchiwanie klawisza) czxekanie x wyjsciem az sie skonczy rysowanie
@@ -19,7 +24,7 @@ bool finish = false;
 
 /*
     zadanie 2
-    zatrzymywanie sie samochodow na torze B gdzy
+    zatrzymywanie sie samochodow na torze B gdy
     samochod z toru A znajduje sie w poblizu skrzyzowania
 */
 
@@ -35,6 +40,8 @@ struct car{
     char id='A';
 };
 
+int numOfCarsA=3;
+struct car args[3];
 vector<car*> carsB;
 vector<pthread_t*> threadsB;
 
@@ -128,16 +135,46 @@ void* car_runner_B(void* arg){
     int xmax=16,ymax=70;
     arg_struct->y=0;
     arg_struct->x=xmin;
+    int cantDrive=0;
 
     //pętla poruszajaca pojazd po torze przez 3 okrazenia
+    
     for(int i=0;i<3 && !finish;i++){
-       for(;arg_struct->y<ymax && !finish;arg_struct->y++){
+ //       pthread_mutex_lock(&mutex1);
+        for(;arg_struct->y<ymax && !finish;arg_struct->y++){
+            for(int i=0; i<numOfCarsA; i++){
+                pthread_mutex_lock(&mutex1);
+                cantDrive += ((arg_struct->y < 25 && args[i].x >= 6 &&
+                            (sqrt((25 - arg_struct->y) * (25 - arg_struct->y)+
+                                    (args[i].x - 6) * (args[i].x - 6))) < detectionRange) ||
+                            arg_struct->y < 55 && args[i].x >= 4 &&
+                            (sqrt((55 - arg_struct->y) * (55 - arg_struct->y)+
+                                    (args[i].x - 6) * (args[i].x - 6))) < detectionRange);
+                pthread_mutex_unlock(&mutex1);
+            }
+        if(cantDrive) arg_struct->y--;
+        cantDrive = 0;
         sleep_for(arg_struct->delay);
         }
+ //       pthread_mutex_unlock(&mutex1);
         for(;arg_struct->x<xmax && !finish;arg_struct->x++){
         sleep_for(arg_struct->delay);
         }
         for(;arg_struct->y>ymin && !finish;arg_struct->y--){
+            for(int i=0; i<numOfCarsA; i++){
+                pthread_mutex_lock(&mutex2);
+                cantDrive += ((arg_struct->y > 55 && args[i].x <=16 &&
+                            (sqrt((55 - arg_struct->y) * (55 - arg_struct->y)+
+                                    (args[i].x - 16) * (args[i].x - 16))) < detectionRange) ||
+                            arg_struct->y > 25 && args[i].x >=16 && args[i].x < 22 &&
+                            (sqrt((25 - arg_struct->y) * (25 - arg_struct->y)+
+                                    (args[i].x - 16) * (args[i].x - 16))) < detectionRange);
+                pthread_mutex_unlock(&mutex2);
+            }
+        if(cantDrive) arg_struct->y++;
+        cantDrive = 0;
+
+
         sleep_for(arg_struct->delay);
         }
         // opuszczenie toru
@@ -205,8 +242,8 @@ int main(int argc, char** argv){
 
 
     // inicjalizacja watkow dla toru A
-    int numOfCarsA=3;
-    struct car args[numOfCarsA];
+  //  numOfCarsA=3;
+  //  args[numOfCarsA];
     pthread_t tids[numOfCarsA];
     for(int i=0; i<numOfCarsA;i++){
         args[i].id='A'+i;
