@@ -10,11 +10,18 @@ using namespace std::this_thread;
 using namespace std::chrono; 
 
 
+pthread_mutex_t mutex0 = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mutex1 = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mutex2 = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mutex3 = PTHREAD_MUTEX_INITIALIZER;
 
+int crossing[4];
 bool finish = false;
 int detectionRange = 7;
+pthread_cond_t cond0 = PTHREAD_COND_INITIALIZER;
+pthread_cond_t cond1 = PTHREAD_COND_INITIALIZER;
+pthread_cond_t cond2 = PTHREAD_COND_INITIALIZER;
+pthread_cond_t cond3 = PTHREAD_COND_INITIALIZER;
 
 /*
     kończenie watkow (nasluchiwanie klawisza) czxekanie x wyjsciem az sie skonczy rysowanie
@@ -36,12 +43,12 @@ int detectionRange = 7;
 struct car{
     int x;
     int y;
-    milliseconds delay=milliseconds(50);
+    milliseconds delay=milliseconds(200);
     char id='A';
 };
 
-int numOfCarsA=3;
-struct car args[3];
+int numOfCarsA=10;
+struct car args[10];
 vector<car*> carsB;
 vector<pthread_t*> threadsB;
 
@@ -102,12 +109,38 @@ void* car_runner_A(void* arg){
         sleep_for(arg_struct->delay);
         }
         for(arg_struct->x=xmin;arg_struct->x<xmax && !finish;arg_struct->x++){
+
+            if(arg_struct->x == 3) crossing[1]++;
+            if(arg_struct->x == 7){
+                crossing[1]--;
+                if(crossing[1 == 0]) pthread_cond_signal(&cond1); 
+            }
+
+            if(arg_struct->x == 12) crossing[2]++;
+            if(arg_struct->x == 17){ 
+                crossing[2]--;
+                if(crossing[2] == 0) pthread_cond_signal(&cond2); 
+            }
+
         sleep_for(arg_struct->delay);
         }
         for(;arg_struct->y>ymin && !finish;arg_struct->y--){
         sleep_for(arg_struct->delay);
         }
         for(;arg_struct->x>xmin && !finish;arg_struct->x--){
+
+            if(arg_struct->x == 21) crossing[3]++;
+            if(arg_struct->x == 15) {
+                crossing[3]--;
+                if(crossing[3] == 0) pthread_cond_signal(&cond3); 
+            }
+
+            if(arg_struct->x == 11) crossing[0]++;
+            if(arg_struct->x == 5){
+                crossing[0]--;
+                if(crossing[4] == 0) pthread_cond_signal(&cond0); 
+            }
+
         sleep_for(arg_struct->delay);
         }
     }
@@ -138,49 +171,28 @@ void* car_runner_B(void* arg){
     int cantDrive=0;
 
     //pętla poruszajaca pojazd po torze przez 3 okrazenia
-    
     for(int i=0;i<3 && !finish;i++){
- //       pthread_mutex_lock(&mutex1);
-        for(;arg_struct->y<ymax && !finish;arg_struct->y++){
-            for(int i=0; i<numOfCarsA; i++){
-                pthread_mutex_lock(&mutex1);
-                cantDrive += ((arg_struct->y < 25 && args[i].x >= 6 &&
-                            (sqrt((25 - arg_struct->y) * (25 - arg_struct->y)+
-                                    (args[i].x - 6) * (args[i].x - 6))) < detectionRange) ||
-                            arg_struct->y < 55 && args[i].x >= 4 &&
-                            (sqrt((55 - arg_struct->y) * (55 - arg_struct->y)+
-                                    (args[i].x - 6) * (args[i].x - 6))) < detectionRange);
-                pthread_mutex_unlock(&mutex1);
-            }
-        if(cantDrive) arg_struct->y--;
-        cantDrive = 0;
-        sleep_for(arg_struct->delay);
+       for(;arg_struct->y<ymax && !finish;arg_struct->y++){
+        if(crossing[0] && (arg_struct->y > 20 && arg_struct->y < 24)) pthread_cond_wait(&cond0, &mutex0);
+        
+        if(crossing[1] && (arg_struct->y > 50 && arg_struct->y < 54)) pthread_cond_wait(&cond1, &mutex1);
+            
+            sleep_for(arg_struct->delay);
         }
- //       pthread_mutex_unlock(&mutex1);
         for(;arg_struct->x<xmax && !finish;arg_struct->x++){
-        sleep_for(arg_struct->delay);
+            sleep_for(arg_struct->delay);
         }
         for(;arg_struct->y>ymin && !finish;arg_struct->y--){
-            for(int i=0; i<numOfCarsA; i++){
-                pthread_mutex_lock(&mutex2);
-                cantDrive += ((arg_struct->y > 55 && args[i].x <=16 &&
-                            (sqrt((55 - arg_struct->y) * (55 - arg_struct->y)+
-                                    (args[i].x - 16) * (args[i].x - 16))) < detectionRange) ||
-                            arg_struct->y > 25 && args[i].x >=16 && args[i].x < 22 &&
-                            (sqrt((25 - arg_struct->y) * (25 - arg_struct->y)+
-                                    (args[i].x - 16) * (args[i].x - 16))) < detectionRange);
-                pthread_mutex_unlock(&mutex2);
-            }
-        if(cantDrive) arg_struct->y++;
-        cantDrive = 0;
-
-
-        sleep_for(arg_struct->delay);
+            if(crossing[2] && (arg_struct->y > 54 && arg_struct->y < 58)) pthread_cond_wait(&cond2, &mutex2);
+            
+            if(crossing[3] && (arg_struct->y > 24 && arg_struct->y < 28)) pthread_cond_wait(&cond3, &mutex3);
+            
+            sleep_for(arg_struct->delay);
         }
         // opuszczenie toru
         if(i==2) break;
         for(;arg_struct->x>xmin && !finish;arg_struct->x--){
-        sleep_for(arg_struct->delay);
+            sleep_for(arg_struct->delay);
         }
     }
     // odjazd samochodu do garazu
@@ -244,6 +256,7 @@ int main(int argc, char** argv){
     // inicjalizacja watkow dla toru A
   //  numOfCarsA=3;
   //  args[numOfCarsA];
+    for(int i=0; i<4; i++) crossing[i]=0;
     pthread_t tids[numOfCarsA];
     for(int i=0; i<numOfCarsA;i++){
         args[i].id='A'+i;
@@ -279,9 +292,19 @@ int main(int argc, char** argv){
             if(argsB[j].y!=0)
             mvprintw(argsB[j].x,argsB[j].y,"%c",argsB[j].id);
         }
+        mvprintw(5,24,"%d",crossing[0]);
+        mvprintw(5,54,"%d",crossing[1]);
+        mvprintw(15,24,"%d",crossing[2]);
+        mvprintw(15,54,"%d",crossing[3]);
         refresh();
         sleep_for(milliseconds(50));
-        if(getch()=='q') finish=true;
+        if(getch()=='q') {
+            finish=true;
+            pthread_cond_signal(&cond0);
+            pthread_cond_signal(&cond1);
+            pthread_cond_signal(&cond2);
+            pthread_cond_signal(&cond3);
+            }
     }
     for(int i = 0; i< numOfCarsA;i++) pthread_join(tids[i], NULL);
     for(int i=0;i<numOfCarsB;i++)pthread_join(tidsB[i], NULL);
