@@ -34,7 +34,6 @@ pthread_cond_t cond1 = PTHREAD_COND_INITIALIZER;
 pthread_cond_t cond2 = PTHREAD_COND_INITIALIZER;
 pthread_cond_t cond3 = PTHREAD_COND_INITIALIZER;
 
-
 /**
  * Struktura zawierajaca pozycję,
  * opoznienie miedzy krokami(predkosc) oraz 
@@ -218,19 +217,18 @@ void* car_runner_B(void* arg){
         for(;arg_struct->y<ymax && !finish;arg_struct->y++){
             pthread_mutex_lock(&mutex0);
             if(arg_struct->y > 16 && arg_struct->y < 23){
-                if(crossing[0]){ // jesli jest samochod na skrzyzowaniu
+                while(crossing[0]){ // jesli jest samochod na skrzyzowaniu
                     if(!isWaiting(queue0,arg_struct->id)) queue0.push_back(arg_struct->id);
                     pthread_cond_wait(&cond0, &mutex0);
                 } //jesli czeka w kolejce i nie jest ostatni to czeka dalej
-                if((isWaiting(queue0,arg_struct->id) && queue0.back() != arg_struct->id)){
-                    pthread_cond_signal(&cond0);
+                while((isWaiting(queue0,arg_struct->id) && queue0.back() != arg_struct->id)){
                     pthread_cond_wait(&cond0, &mutex0);
                 }   
             }
             pthread_mutex_unlock(&mutex0);
             pthread_mutex_lock(&mutexQueue0);
             if(arg_struct->y == 23) {
-                if(!queue0.empty()) queue0.erase(find(queue0.begin(), queue0.end(), arg_struct->id));
+                if(!queue0.empty() && isWaiting(queue0,arg_struct->id)) queue0.erase(find(queue0.begin(), queue0.end(), arg_struct->id));
                 pthread_cond_broadcast(&cond0);
             }
             pthread_mutex_unlock(&mutexQueue0);
@@ -238,19 +236,18 @@ void* car_runner_B(void* arg){
             //
             pthread_mutex_lock(&mutex1);
             if(arg_struct->y > 46 && arg_struct->y < 53){
-                if(crossing[1]){
+                while(crossing[1]){
                     if(!isWaiting(queue1,arg_struct->id)) queue1.push_back(arg_struct->id);
                     pthread_cond_wait(&cond1, &mutex1);
                 } 
-                if((isWaiting(queue1,arg_struct->id) && queue1.back() != arg_struct->id)){
-                    pthread_cond_signal(&cond1);
+                while((isWaiting(queue1,arg_struct->id) && queue1.back() != arg_struct->id)){
                     pthread_cond_wait(&cond1, &mutex1);
                 }   
             }
             pthread_mutex_unlock(&mutex1);
             pthread_mutex_lock(&mutexQueue1);
             if(arg_struct->y == 53) {
-                if(!queue1.empty()) queue1.erase(find(queue1.begin(), queue1.end(), arg_struct->id));
+                if(!queue1.empty() && isWaiting(queue1,arg_struct->id)) queue1.erase(find(queue1.begin(), queue1.end(), arg_struct->id));
                 pthread_cond_broadcast(&cond1);
             }
             pthread_mutex_unlock(&mutexQueue1);
@@ -263,38 +260,36 @@ void* car_runner_B(void* arg){
         for(;arg_struct->y>ymin && !finish;arg_struct->y--){
             pthread_mutex_lock(&mutex2);
             if(arg_struct->y > 55 && arg_struct->y < 60){
-                if(crossing[2]){
+                while(crossing[2]){
                     if(!isWaiting(queue2,arg_struct->id)) queue2.push_back(arg_struct->id);
                     pthread_cond_wait(&cond2, &mutex2);
                 } 
-                if((isWaiting(queue2,arg_struct->id) && queue2.back() != arg_struct->id)){
-                    pthread_cond_signal(&cond2);
+                while((isWaiting(queue2,arg_struct->id) && queue2.back() != arg_struct->id)){
                     pthread_cond_wait(&cond2, &mutex2);
                 }   
             }
             pthread_mutex_unlock(&mutex2);
             pthread_mutex_lock(&mutexQueue2);
             if(arg_struct->y == 55) {
-                if(!queue2.empty()) queue2.erase(find(queue2.begin(), queue2.end(), arg_struct->id));
+                if(!queue2.empty() && isWaiting(queue2,arg_struct->id)) queue2.erase(find(queue2.begin(), queue2.end(), arg_struct->id));
                 pthread_cond_broadcast(&cond2);
             }
             pthread_mutex_unlock(&mutexQueue2);
             //
             pthread_mutex_lock(&mutex3);
             if(arg_struct->y > 25 && arg_struct->y < 30){
-                if(crossing[3]){
+                while(crossing[3]){
                     if(!isWaiting(queue3,arg_struct->id)) queue3.push_back(arg_struct->id);
                     pthread_cond_wait(&cond3, &mutex3);
                 } 
-                if((isWaiting(queue3,arg_struct->id) && queue3.back() != arg_struct->id)){
-                    pthread_cond_signal(&cond3);
+                while((isWaiting(queue3,arg_struct->id) && queue3.back() != arg_struct->id)){
                     pthread_cond_wait(&cond3, &mutex3);
                 }   
             }
             pthread_mutex_unlock(&mutex3);
             pthread_mutex_lock(&mutexQueue3);
-            if(arg_struct->y == 30) {
-                if(!queue3.empty()) queue3.erase(find(queue3.begin(), queue3.end(), arg_struct->id));
+            if(arg_struct->y == 25) {
+                if(!queue3.empty() && isWaiting(queue3,arg_struct->id)) queue3.erase(find(queue3.begin(), queue3.end(), arg_struct->id));
                 pthread_cond_broadcast(&cond3);
             }
             pthread_mutex_unlock(&mutexQueue3);
@@ -440,8 +435,7 @@ int main(int argc, char** argv){
                 pthread_cond_broadcast(&cond2);
                 pthread_cond_broadcast(&cond3);
             }
-            
-            }
+        }
     }
     for(int i = 0; i< numOfCarsA;i++) pthread_join(tids[i], NULL);
     for(int i=0;i<numOfCarsB;i++)pthread_join(tidsB[i], NULL);
